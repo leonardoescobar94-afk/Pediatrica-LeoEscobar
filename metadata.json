@@ -1,0 +1,6 @@
+{
+  "name": "Evaluación de Escalas Pediátricas",
+  "description": "Aplicación clínica modular para evaluación de escalas del desarrollo pediátrico (como la escala ELM), cálculo del coeficiente de desarrollo y generación de reportes clínicos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
