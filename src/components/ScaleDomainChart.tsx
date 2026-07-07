@@ -233,7 +233,7 @@ export const ScaleDomainChart: React.FC<ScaleDomainChartProps> = ({
               return (
                 <div key={item.id} id={`chart-row-${item.id}`} className="relative flex flex-col">
                   <div 
-                    className={`grid grid-cols-[54px_110px_1fr] sm:grid-cols-[54px_160px_1fr] md:grid-cols-[54px_200px_1fr] items-center gap-1.5 sm:gap-3 py-0.5 sm:py-1 px-1 sm:px-2 rounded transition-all duration-150 ${
+                    className={`grid grid-cols-[44px_150px_1fr] sm:grid-cols-[44px_230px_1fr] md:grid-cols-[44px_280px_1fr] items-center gap-2 sm:gap-3 py-0.5 sm:py-1 px-1 sm:px-2 rounded transition-all duration-150 ${
                       isSelected 
                         ? 'bg-amber-50/80 border-l-2 border-amber-500 font-bold' 
                         : status === 'yes'
@@ -290,18 +290,18 @@ export const ScaleDomainChart: React.FC<ScaleDomainChartProps> = ({
                     {/* COL 2: Name & Index (Clicking here sets neurological age to this item's P50) */}
                     <div 
                       onClick={() => onAgeChange(item.edad_50)}
-                      className="flex items-center justify-between gap-1 min-w-0 cursor-pointer hover:opacity-80"
-                      title={`Haz clic para fijar la edad neurológica a ${item.edad_50} meses`}
+                      className="flex items-start justify-between gap-1.5 min-w-0 cursor-pointer hover:opacity-80"
+                      title={`Hito: ${item.name} (Clic para fijar edad neurológica a ${item.edad_50} meses)`}
                     >
-                      <div className="flex items-center gap-1 min-w-0">
-                        <span className="text-[9px] font-mono text-slate-500 bg-slate-200 px-1 rounded-sm font-bold shrink-0">
+                      <div className="flex items-start gap-1.5 min-w-0 flex-1">
+                        <span className="text-[9px] font-mono text-slate-500 bg-slate-200 px-1.5 py-0.5 rounded-sm font-bold shrink-0 mt-0.5">
                           {item.index}
                         </span>
-                        <span className="text-[10px] sm:text-[11px] text-slate-800 font-medium truncate">
+                        <span className="text-[10px] sm:text-[11px] text-slate-800 font-semibold leading-tight whitespace-normal break-words">
                           {item.name}
                         </span>
                         {item.aproximado && (
-                          <span className="text-[8px] text-amber-600 bg-amber-50 px-0.5 rounded border border-amber-100 shrink-0 font-medium">
+                          <span className="text-[8px] text-amber-600 bg-amber-50 px-0.5 rounded border border-amber-100 shrink-0 font-medium mt-0.5">
                             aprox.
                           </span>
                         )}
@@ -372,7 +372,7 @@ export const ScaleDomainChart: React.FC<ScaleDomainChartProps> = ({
 
                   {/* Expanded indications */}
                   {showItemNotes === item.id && item.observaciones && (
-                    <div className="ml-[54px] sm:ml-[214px] md:ml-[254px] mr-1 my-1 bg-amber-50 border border-amber-100 rounded p-1.5 text-[10px] text-amber-950 shadow-2xs leading-relaxed animate-fade-in italic">
+                    <div className="ml-[52px] sm:ml-[56px] mr-1 my-1 bg-amber-50 border border-amber-100 rounded p-1.5 text-[10px] text-amber-950 shadow-2xs leading-relaxed animate-fade-in italic">
                       <span className="font-bold text-amber-900 block not-italic">Indicación clínica:</span>
                       {item.observaciones}
                     </div>
@@ -382,7 +382,7 @@ export const ScaleDomainChart: React.FC<ScaleDomainChartProps> = ({
             })}
 
             {/* TIMELINE GRID TICK AXIS */}
-            <div className="grid grid-cols-[54px_110px_1fr] sm:grid-cols-[54px_160px_1fr] md:grid-cols-[54px_200px_1fr] items-center gap-1.5 sm:gap-3 mt-2 pt-1.5 border-t border-slate-200 relative h-7 select-none">
+            <div className="grid grid-cols-[44px_150px_1fr] sm:grid-cols-[44px_230px_1fr] md:grid-cols-[44px_280px_1fr] items-center gap-2 sm:gap-3 mt-2 pt-1.5 border-t border-slate-200 relative h-7 select-none">
               <div className="col-span-2"></div>
               <div className="relative h-full">
                 {monthTicks.map((m) => {
@@ -408,7 +408,7 @@ export const ScaleDomainChart: React.FC<ScaleDomainChartProps> = ({
               ref={containerRef}
               onMouseDown={handleMouseDown}
               onTouchStart={handleTouchStart}
-              className="absolute top-0 bottom-7 left-[164px] sm:left-[214px] md:left-[254px] right-0 z-10 cursor-ew-resize select-none"
+              className="absolute top-0 bottom-7 left-[210px] sm:left-[298px] md:left-[348px] right-0 z-10 cursor-ew-resize select-none"
             >
               {/* VERTICAL RED MOVABLE LINE */}
               <div 
