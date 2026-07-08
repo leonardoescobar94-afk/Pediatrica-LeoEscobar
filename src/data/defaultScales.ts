@@ -5,6 +5,8 @@
 
 import { Scale } from '../types';
 
+import { HAIZEA_LLEVANT_SCALE } from './haizeaLlevant';
+
 export const DEFAULT_ELM_SCALE: Scale = {
   id: 'elm-scale',
   name: 'Early Language Milestones (ELM)',
@@ -76,4 +78,4 @@ export const DEFAULT_ELM_SCALE: Scale = {
   ]
 };
 
-export const INITIAL_SCALES: Scale[] = [DEFAULT_ELM_SCALE];
+export const INITIAL_SCALES: Scale[] = [DEFAULT_ELM_SCALE, HAIZEA_LLEVANT_SCALE];

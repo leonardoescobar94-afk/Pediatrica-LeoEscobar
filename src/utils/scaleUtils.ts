@@ -159,7 +159,9 @@ export function generateClinicalReportText(
   scaleName: string,
   evaluationDate: string,
   chronologicalAge: number,
-  globalResult: GlobalResult
+  globalResult: GlobalResult,
+  p95Warnings: string[] = [],
+  checkedAlertSigns: string[] = []
 ): string {
   // Format Date from YYYY-MM-DD to DD/MM/AAAA
   let formattedDate = evaluationDate;
@@ -170,6 +172,64 @@ export function generateClinicalReportText(
     }
   }
 
+  // Specific layout for Haizea-Llevant scale
+  if (scaleName.toLowerCase().includes('haizea') || scaleName.toLowerCase().includes('llevant')) {
+    const hlLines: string[] = [];
+    hlLines.push(`[FECHA ${formattedDate}]`);
+    hlLines.push('');
+    hlLines.push(`Haizea-Llevant:`);
+    hlLines.push(`Edad cronológica: ${chronologicalAge} meses.`);
+    hlLines.push('');
+    hlLines.push(`Resultado global:`);
+    hlLines.push(`Edad de desarrollo global estimada: ${globalResult.globalNeurologicalAge} meses.`);
+    hlLines.push(`Coeficiente de desarrollo global: ${globalResult.globalCd}%.`);
+    hlLines.push(`Clasificación global: ${globalResult.globalClassification.toLowerCase()}.`);
+    hlLines.push('');
+    hlLines.push(`Resultado por áreas:`);
+    
+    globalResult.domainResults.forEach(dr => {
+      const itemText = dr.representativeItem 
+        ? `${dr.representativeItem.index}. ${dr.representativeItem.name}`
+        : 'N/A';
+      hlLines.push(`${dr.domainName}: edad estimada ${dr.neurologicalAge} meses. CD: ${dr.cd}%. Clasificación: ${dr.classification}. Ítem representativo: ${itemText}.`);
+      if (dr.observaciones.trim()) {
+        hlLines.push(`   Observaciones: ${dr.observaciones.trim()}`);
+      }
+    });
+
+    hlLines.push('');
+    hlLines.push(`Ítems no logrados después del P95:`);
+    if (p95Warnings.length > 0) {
+      p95Warnings.forEach(w => {
+        hlLines.push(`- ${w}`);
+      });
+    } else {
+      hlLines.push(`- No se identifican`);
+    }
+
+    hlLines.push('');
+    hlLines.push(`Signos de alerta presentes:`);
+    if (checkedAlertSigns.length > 0) {
+      checkedAlertSigns.forEach(s => {
+        hlLines.push(`- ${s}`);
+      });
+    } else {
+      hlLines.push(`- No se identifican`);
+    }
+
+    hlLines.push('');
+    hlLines.push(`Interpretación:`);
+    hlLines.push(`Resultado estimado según escala gráfica Haizea-Llevant. Interpretar en conjunto con historia clínica, examen neurológico, antecedentes perinatales, contexto funcional y evolución longitudinal.`);
+
+    if (p95Warnings.length > 0 || checkedAlertSigns.length > 0) {
+      hlLines.push('');
+      hlLines.push(`“Se identifican hallazgos de alerta del desarrollo; se recomienda evaluación clínica cuidadosa y seguimiento/intervención según contexto.”`);
+    }
+
+    return hlLines.join('\n');
+  }
+
+  // Fallback default layout for ELM and others
   const lines: string[] = [];
   lines.push(`[FECHA EN ${formattedDate}]`);
   lines.push('');

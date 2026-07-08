@@ -14,6 +14,29 @@ export interface ScaleItem {
   metodo?: 'H' | 'T' | 'O' | string; // H: historia, T: prueba directa, O: observación fortuita
   observaciones?: string;
   aproximado?: boolean;
+  
+  // Haizea-Llevant aliases for full compatibility
+  scaleId?: string;
+  domain?: string;
+  label?: string; // same as name
+  age50?: number; // same as edad_50
+  age75?: number; // same as edad_75
+  age95?: number; // same as edad_90
+  approximate?: boolean; // same as aproximado
+  notes?: string; // same as observaciones
+}
+
+export interface AlertSign {
+  id: string;
+  scaleId: "haizea-llevant" | string;
+  domain: "socializacion" | "lenguaje_logica_matematica" | "manipulacion" | "postural" | "general" | string;
+  label: string;
+  startAge?: number;
+  endAge?: number;
+  appliesFromAge?: number;
+  alwaysRelevant?: boolean;
+  approximate: boolean;
+  notes?: string;
 }
 
 export interface ScaleDomain {
@@ -29,6 +52,7 @@ export interface Scale {
   minAgeMonths: number;
   maxAgeMonths: number;
   domains: ScaleDomain[];
+  alertSigns?: AlertSign[]; // Added for Haizea-Llevant alert signs support
 }
 
 export interface DomainResult {

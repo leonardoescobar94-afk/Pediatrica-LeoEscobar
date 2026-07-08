@@ -3,11 +3,14 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Scale, GlobalResult } from './types';
 import { INITIAL_SCALES, DEFAULT_ELM_SCALE } from './data/defaultScales';
 import { ScaleDomainChart } from './components/ScaleDomainChart';
 import { ScaleEditor } from './components/ScaleEditor';
+import { AlertSignSelector } from './components/AlertSignSelector';
+import { DomainResultCard } from './components/DomainResultCard';
+import { CopyClinicalReportButton } from './components/CopyClinicalReportButton';
 import { 
   calculateGlobalResult, 
   generateClinicalReportText, 
@@ -52,6 +55,34 @@ export default function App() {
   const [neurologicalAges, setNeurologicalAges] = useState<Record<string, number>>({});
   const [domainObservaciones, setDomainObservaciones] = useState<Record<string, string>>({});
 
+  // Tri-state checklist for milestones (keyed by itemId)
+  const [checkedItems, setCheckedItems] = useState<Record<string, 'yes' | 'no' | 'none'>>(() => {
+    try {
+      const saved = localStorage.getItem('pediatric_checked_items_map');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Checkbox state for alert signs (keyed by alertId)
+  const [checkedAlerts, setCheckedAlerts] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('pediatric_checked_alerts_map');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('pediatric_checked_items_map', JSON.stringify(checkedItems));
+  }, [checkedItems]);
+
+  useEffect(() => {
+    localStorage.setItem('pediatric_checked_alerts_map', JSON.stringify(checkedAlerts));
+  }, [checkedAlerts]);
+
   // Global calculations
   const [globalResult, setGlobalResult] = useState<GlobalResult | null>(null);
 
@@ -71,7 +102,17 @@ export default function App() {
       try {
         const parsed = JSON.parse(stored);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          setScales(parsed);
+          // Check if there are scales in INITIAL_SCALES that are missing from the stored list
+          const missingScales = INITIAL_SCALES.filter(
+            initialScale => !parsed.some(s => s.id === initialScale.id)
+          );
+          if (missingScales.length > 0) {
+            const merged = [...parsed, ...missingScales];
+            setScales(merged);
+            localStorage.setItem('pediatric_developmental_scales', JSON.stringify(merged));
+          } else {
+            setScales(parsed);
+          }
           return;
         }
       } catch (e) {
@@ -146,12 +187,37 @@ export default function App() {
       setAgeWarning('La edad cronológica debe ser mayor a 0 meses.');
     } else if (age < 1) {
       setAgeWarning('Nota: La edad ingresada es menor de 1 mes (petición de confirmación de edad neonatal).');
-    } else if (age > 36) {
-      setAgeWarning('ELM está diseñada principalmente para 0 a 36 meses; interpretar con cautela.');
+    } else if (selectedScaleId === 'haizea-llevant' && age > 60) {
+      setAgeWarning('La escala Haizea-Llevant está diseñada principalmente para 0 a 60 meses; interpretar con cautela.');
+    } else if (selectedScaleId === 'elm-scale' && age > 36) {
+      setAgeWarning('La escala ELM está diseñada principalmente para 0 a 36 meses; interpretar con cautela.');
     } else {
       setAgeWarning(null);
     }
   };
+
+  // --- MEMOIZED HL ALERTS AND WARNINGS ---
+  const p95Warnings = useMemo(() => {
+    const warnings: string[] = [];
+    activeScale.domains.forEach(domain => {
+      domain.items.forEach(item => {
+        if (checkedItems[item.id] === 'no' && chronologicalAge > item.edad_90) {
+          warnings.push(`${domain.name}: Hito "${item.name}" (Límite P95: ${item.edad_90}m)`);
+        }
+      });
+    });
+    return warnings;
+  }, [activeScale, checkedItems, chronologicalAge]);
+
+  const checkedAlertSignsList = useMemo(() => {
+    if (!activeScale.alertSigns) return [];
+    return activeScale.alertSigns
+      .filter(sign => checkedAlerts[sign.id])
+      .map(sign => {
+        const domName = sign.domain ? (activeScale.domains.find(d => d.id === sign.domain)?.name || sign.domain) : 'General';
+        return `${domName}: ${sign.label}`;
+      });
+  }, [activeScale, checkedAlerts]);
 
   // --- TRIGGER CALCULATIONS ---
   const handleCalculate = () => {
@@ -172,7 +238,9 @@ export default function App() {
       activeScale.name,
       evaluationDate,
       chronologicalAge,
-      result
+      result,
+      p95Warnings,
+      checkedAlertSignsList
     );
 
     navigator.clipboard.writeText(reportText).then(() => {
@@ -203,6 +271,8 @@ export default function App() {
     setChronologicalAgeInput('12');
     setChronologicalAge(12);
     setAgeWarning(null);
+    setCheckedItems({});
+    setCheckedAlerts({});
     
     const today = new Date().toISOString().split('T')[0];
     setEvaluationDate(today);
@@ -211,7 +281,8 @@ export default function App() {
     const resetAges: Record<string, number> = {};
     const resetObs: Record<string, string> = {};
     activeScale.domains.forEach(dom => {
-      resetAges[dom.id] = 12;
+      const clamped = Math.max(activeScale.minAgeMonths, Math.min(activeScale.maxAgeMonths, 12));
+      resetAges[dom.id] = clamped;
       resetObs[dom.id] = '';
     });
     setNeurologicalAges(resetAges);
@@ -236,8 +307,9 @@ export default function App() {
   };
 
   const handleDeleteScale = (scaleId: string) => {
-    if (scaleId === 'elm-scale') {
-      alert('La escala ELM es de fábrica y no puede eliminarse.');
+    const isFactory = INITIAL_SCALES.some(initial => initial.id === scaleId);
+    if (isFactory) {
+      alert('Las escalas de fábrica no pueden eliminarse.');
       return;
     }
     const updatedScales = scales.filter(sc => sc.id !== scaleId);
@@ -248,12 +320,15 @@ export default function App() {
   const handleRestoreOriginals = () => {
     if (confirm('¿Deseas restaurar la escala original de fábrica? Perderás cualquier cambio de calibración realizado sobre ella.')) {
       const factoryScales = scales.map(sc => {
-        if (sc.id === 'elm-scale') {
-          return { ...DEFAULT_ELM_SCALE };
+        const matchingFactory = INITIAL_SCALES.find(initial => initial.id === sc.id);
+        if (matchingFactory) {
+          return { ...matchingFactory };
         }
         return sc;
       });
-      saveScalesToDb(factoryScales);
+      const missingScales = INITIAL_SCALES.filter(initial => !factoryScales.some(sc => sc.id === initial.id));
+      const finalScales = [...factoryScales, ...missingScales];
+      saveScalesToDb(finalScales);
       alert('Valores preestablecidos de fábrica restaurados.');
     }
   };
@@ -265,7 +340,9 @@ export default function App() {
       activeScale.name,
       evaluationDate,
       chronologicalAge,
-      globalResult
+      globalResult,
+      p95Warnings,
+      checkedAlertSignsList
     );
 
     navigator.clipboard.writeText(reportText).then(() => {
@@ -507,6 +584,7 @@ export default function App() {
               <ScaleDomainChart
                 key={domain.id}
                 domain={domain}
+                scaleId={activeScale.id}
                 selectedAge={neurologicalAges[domain.id] || 12}
                 chronologicalAge={chronologicalAge}
                 onAgeChange={(newAge) => {
@@ -524,9 +602,33 @@ export default function App() {
                 }}
                 minAge={activeScale.minAgeMonths}
                 maxAge={activeScale.maxAgeMonths}
+                checkedItems={checkedItems}
+                onCheckedItemChange={(itemId, status) => {
+                  setCheckedItems(prev => ({
+                    ...prev,
+                    [itemId]: status
+                  }));
+                }}
               />
             ))}
           </div>
+
+          {/* WARNING/ALERT SIGNS INTERACTIVE LIST */}
+          {activeScale.alertSigns && activeScale.alertSigns.length > 0 && (
+            <div className="pt-4">
+              <AlertSignSelector
+                alertSigns={activeScale.alertSigns}
+                checkedAlerts={checkedAlerts}
+                onChange={(alertId, isChecked) => {
+                  setCheckedAlerts(prev => ({
+                    ...prev,
+                    [alertId]: isChecked
+                  }));
+                }}
+                chronologicalAge={chronologicalAge}
+              />
+            </div>
+          )}
         </div>
 
         {/* CLINICAL SUMMARY & CLIPBOARD COPY REPORT */}
@@ -545,18 +647,13 @@ export default function App() {
                 </div>
               </div>
 
-              <button
-                onClick={handleCopyReport}
-                className={`text-xs font-bold px-4 py-2.5 rounded-lg transition flex items-center gap-2 shadow-xs ${
-                  copyStatus 
-                    ? 'bg-emerald-600 text-white hover:bg-emerald-700' 
-                    : 'bg-slate-900 hover:bg-slate-800 text-white'
-                }`}
-                id="btn-copy-clinical"
-              >
-                {copyStatus ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                {copyStatus ? '¡Copiado!' : 'Copiar para historia clínica'}
-              </button>
+              <CopyClinicalReportButton
+                reportText={generateClinicalReportText(activeScale.name, evaluationDate, chronologicalAge, globalResult, p95Warnings, checkedAlertSignsList)}
+                onCopySuccess={() => {
+                  setCopyStatus(true);
+                  setTimeout(() => setCopyStatus(false), 2500);
+                }}
+              />
             </div>
 
             {/* RESULTS METRICS CARDS */}
@@ -608,46 +705,63 @@ export default function App() {
               </div>
             </div>
 
+            {/* DOMAIN BENTO GRID CARDS */}
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                Resultados por Dominio (Tarjetas Clínicas)
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {globalResult.domainResults.map((dr) => (
+                  <DomainResultCard key={dr.domainId} result={dr} />
+                ))}
+              </div>
+            </div>
+
             {/* TABLE COMPARISON DOMAINS */}
-            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-slate-50 text-slate-700 border-b border-slate-200">
-                  <tr>
-                    <th className="p-3 font-semibold">Área / Dominio</th>
-                    <th className="p-3 font-semibold">Hito Representativo</th>
-                    <th className="p-3 font-semibold w-28">Edad Estimada</th>
-                    <th className="p-3 font-semibold w-24">CD</th>
-                    <th className="p-3 font-semibold w-32">Clasificación</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-slate-600">
-                  {globalResult.domainResults.map((dr) => {
-                    const badgeClass = getClassificationColorClass(dr.classification);
-                    return (
-                      <tr key={dr.domainId} className="hover:bg-slate-50/50">
-                        <td className="p-3 font-semibold text-slate-800">{dr.domainName}</td>
-                        <td className="p-3">
-                          {dr.representativeItem ? (
-                            <div>
-                              <span className="font-bold text-slate-700">{dr.representativeItem.index}. {dr.representativeItem.name}</span>
-                              <span className="text-[10px] text-slate-500 block">Percentil: {dr.representativePercentile}</span>
-                            </div>
-                          ) : (
-                            <span className="italic text-slate-400">N/A</span>
-                          )}
-                        </td>
-                        <td className="p-3 font-semibold font-mono text-slate-700">{dr.neurologicalAge} meses</td>
-                        <td className="p-3 font-semibold font-mono text-slate-700">{dr.cd}%</td>
-                        <td className="p-3">
-                          <span className={`text-[10px] font-bold px-2 py-1 rounded border uppercase tracking-wider block text-center ${badgeClass}`}>
-                            {dr.classification.split(' / ')[0]}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                Tabla Comparativa General
+              </h3>
+              <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-slate-50 text-slate-700 border-b border-slate-200">
+                    <tr>
+                      <th className="p-3 font-semibold">Área / Dominio</th>
+                      <th className="p-3 font-semibold">Hito Representativo</th>
+                      <th className="p-3 font-semibold w-28">Edad Estimada</th>
+                      <th className="p-3 font-semibold w-24">CD</th>
+                      <th className="p-3 font-semibold w-32">Clasificación</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-600">
+                    {globalResult.domainResults.map((dr) => {
+                      const badgeClass = getClassificationColorClass(dr.classification);
+                      return (
+                        <tr key={dr.domainId} className="hover:bg-slate-50/50">
+                          <td className="p-3 font-semibold text-slate-800">{dr.domainName}</td>
+                          <td className="p-3">
+                            {dr.representativeItem ? (
+                              <div>
+                                <span className="font-bold text-slate-700">{dr.representativeItem.index}. {dr.representativeItem.name}</span>
+                                <span className="text-[10px] text-slate-500 block">Percentil: {dr.representativePercentile}</span>
+                              </div>
+                            ) : (
+                              <span className="italic text-slate-400">N/A</span>
+                            )}
+                          </td>
+                          <td className="p-3 font-semibold font-mono text-slate-700">{dr.neurologicalAge} meses</td>
+                          <td className="p-3 font-semibold font-mono text-slate-700">{dr.cd}%</td>
+                          <td className="p-3">
+                            <span className={`text-[10px] font-bold px-2 py-1 rounded border uppercase tracking-wider block text-center ${badgeClass}`}>
+                              {dr.classification.split(' / ')[0]}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* PLAIN COPIABLE REPORT TEXTAREA */}
@@ -661,7 +775,7 @@ export default function App() {
               <textarea
                 id="report-textarea"
                 readOnly
-                value={generateClinicalReportText(activeScale.name, evaluationDate, chronologicalAge, globalResult)}
+                value={generateClinicalReportText(activeScale.name, evaluationDate, chronologicalAge, globalResult, p95Warnings, checkedAlertSignsList)}
                 className="w-full h-48 font-mono text-xs bg-slate-50 text-slate-700 border border-slate-300 rounded-xl p-4.5 focus:outline-none custom-scrollbar select-all"
               />
             </div>
@@ -674,9 +788,11 @@ export default function App() {
       <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-12 pt-6 border-t border-slate-200">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div>
-            <p><strong>Early Language Milestones (ELM) Evaluation System</strong></p>
-            <p className="mt-1">
-              Desarrollado bajo pautas metodológicas clínicas de pediatría y fonoaudiología. Referencia: James Coplan, M.D.
+            <p><strong>Módulo de Evaluación de Escalas del Desarrollo Pediátrico (ELM & Haizea-Llevant)</strong></p>
+            <p className="mt-1 leading-relaxed">
+              Desarrollado bajo pautas metodológicas clínicas de pediatría, fonoaudiología y psicomotricidad infantil. <br />
+              • Referencia ELM: James Coplan, M.D. <br />
+              • Referencia Haizea-Llevant: Dr. Javier Fuentes-Biggi, et al. / Gobierno Vasco.
             </p>
           </div>
           <div className="flex gap-4">
