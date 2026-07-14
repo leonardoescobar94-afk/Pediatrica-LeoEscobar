@@ -142,7 +142,7 @@ export const DevelopmentScaleChart: React.FC<DevelopmentScaleChartProps> = ({
   return (
     <div className="relative border border-slate-150 rounded-lg bg-slate-50/50 p-2 sm:p-3 overflow-x-auto custom-scrollbar flex flex-col min-w-full">
       {/* Scrollable container content */}
-      <div className="relative select-none flex flex-col gap-1 min-w-[550px] sm:min-w-[700px] md:min-w-[850px] lg:min-w-none pr-1">
+      <div className="relative select-none flex flex-col gap-1 min-w-[550px] sm:min-w-[700px] md:min-w-[850px] lg:min-w-0 pr-1">
         
         {/* ITEM BARS STACKED */}
         <div className="flex flex-col gap-1">
